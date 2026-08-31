@@ -18,9 +18,11 @@ flow straight to LPs.
 ## How it works
 
 1. **Auction (before the epoch starts).** Searchers bid ETH for the license
-   to epoch *N* on a given pool. Bidding closes a fixed number of blocks
-   before epoch *N* begins, so the winner is known before any swap in that
-   epoch executes.
+   to epoch *N* on a given pool. Bidding is open while
+   `block.number < startBlock(N) - BIDDING_BUFFER_BLOCKS`, and closes
+   exactly at that boundary block — the same block settlement becomes
+   available, so there's no gap where neither bidding nor settling is
+   possible.
 2. **Settlement.** The winning bid is minted as an **ERC-1155 license token**
    (`id = pack(poolId, epoch)`) to the winner, and the bid amount is
    `donate()`'d straight into the pool as LP fees.
@@ -101,7 +103,36 @@ v4-core/=lib/v4-core/
 v4-periphery/=lib/v4-periphery/
 @openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 forge-std/=lib/forge-std/src/
+solmate/=lib/v4-core/lib/solmate/
 ```
+> `solmate` is only needed for the tests (`MockERC20`) and typically already
+> sits inside v4-core's own `lib/` as a transitive dependency — adjust the
+> path if your pinned v4-core vendors it elsewhere, or add
+> `forge install transmissions11/solmate` directly if it's missing.
+
+## Running tests
+
+```bash
+forge test -vvv
+```
+
+Test layout:
+```
+test/
+  ArbLicenseHook.t.sol      Full pool integration: threshold gating, scaling
+                             unlicensed tax, flat licensed tax, permit edge cases
+  EpochAuction.t.sol         Bidding, outbidding, refunds, settlement, LP donation
+  LicenseNFT.t.sol           Mint gating, transferability
+  libraries/
+    Epoch.t.sol               Block-math correctness
+    LicenseId.t.sol            Packing/collision checks
+    LicensePermit.t.sol        EIP-712 signature verification, expiry, wrong signer
+```
+
+`ArbLicenseHook.t.sol` and `EpochAuction.t.sol` spin up a real `PoolManager`
+and pool via v4-core's `Deployers` test base and mine the hook's deploy
+address via `HookMiner` — these are the most version-sensitive files in the
+suite (see the version-sensitivity note at the top of each file).
 
 > **Version sensitivity:** v4's hook and callback APIs changed several times
 > during development. Before deploying, verify against your pinned commit:
@@ -120,6 +151,12 @@ forge-std/=lib/forge-std/src/
    address encoding the correct hook-permission flags (v4's standard
    `HookMiner` / `CREATE2` flow).
 5. Initialize your pool with `ArbLicenseHook` set in `PoolKey.hooks`.
+   **Must use `LPFeeLibrary.DYNAMIC_FEE_FLAG` as the pool's fee, not a static
+   fee value.** Without it, `PoolManager` silently ignores the override fee
+   the hook returns from `beforeSwap` — swaps will emit the correct
+   `TaxApplied` event but pay whatever static fee you set instead of the
+   actual tax. This bit us in testing; see `ArbLicenseHook.t.sol`'s
+   `initPool(...)` call for the fix.
 6. Deploy `DemoSwapRouter(poolManager)` for testing.
 
 ## Demoing the tax difference
