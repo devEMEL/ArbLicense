@@ -4,6 +4,7 @@ pragma solidity ^0.8.26;
 import {Test} from "forge-std/Test.sol";
 import {LicenseNFT} from "@arblicense/LicenseNFT.sol";
 
+
 contract LicenseNFTTest is Test {
     LicenseNFT internal nft;
 

@@ -16,19 +16,22 @@ import {Vm} from "forge-std/Vm.sol";
 import {Deployers} from "@uniswap/v4-core/test/utils/Deployers.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
+import {LPFeeLibrary} from "@uniswap/v4-core/src/libraries/LPFeeLibrary.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol";
+import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 import {PoolSwapTest} from "@uniswap/v4-core/src/test/PoolSwapTest.sol";
 import {HookMiner} from "@uniswap/v4-periphery/src/utils/HookMiner.sol";
-import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
-import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 import {
     ModifyLiquidityParams,
     SwapParams
 } from "@uniswap/v4-core/src/types/PoolOperation.sol";
+
 import {ArbLicenseHook} from "@arblicense/ArbLicenseHook.sol";
 import {LicenseNFT} from "@arblicense/LicenseNFT.sol";
 import {LicenseId} from "@arblicense-libraries/LicenseId.sol";
@@ -73,7 +76,11 @@ contract ArbLicenseHookTest is Test, Deployers {
         // EpochAuction, which is tested separately).
         licenseNFT.setAuction(address(this));
 
-        (key,) = initPool(currency0, currency1, IHooks(address(hook)), 3000, SQRT_PRICE_1_1);
+        // IMPORTANT: must init with the dynamic-fee flag, not a static fee
+        // value — without this, PoolManager silently IGNORES the override
+        // fee our hook returns from beforeSwap, and every swap just pays
+        // whatever static fee was set here regardless of tax logic.
+        (key,) = initPool(currency0, currency1, IHooks(address(hook)), LPFeeLibrary.DYNAMIC_FEE_FLAG, SQRT_PRICE_1_1);
 
         modifyLiquidityRouter.modifyLiquidity{value: 10 ether}(
             key,
@@ -124,8 +131,11 @@ contract ArbLicenseHookTest is Test, Deployers {
     }
 
     /// @dev Pulls taxBps out of the most recently emitted TaxApplied event.
-    function _lastTaxAppliedBps() internal returns (uint24 taxBps) {
-        Vm.Log[] memory logs = vm.getRecordedLogs();
+    ///      Takes `logs` as a parameter rather than calling
+    ///      vm.getRecordedLogs() itself — that cheatcode consumes the buffer,
+    ///      so calling it more than once per test silently returns empty on
+    ///      every call after the first. Capture logs ONCE per test and reuse.
+    function _lastTaxAppliedBps(Vm.Log[] memory logs) internal pure returns (uint24 taxBps) {
         for (uint256 i = logs.length; i > 0; i--) {
             Vm.Log memory log = logs[i - 1];
             if (log.topics.length > 0 && log.topics[0] == ArbLicenseHook.TaxApplied.selector) {
@@ -136,8 +146,7 @@ contract ArbLicenseHookTest is Test, Deployers {
         revert("TaxApplied event not found");
     }
 
-    function _lastLicenseHonoredEmitted() internal returns (bool found) {
-        Vm.Log[] memory logs = vm.getRecordedLogs();
+    function _licenseHonoredEmitted(Vm.Log[] memory logs) internal pure returns (bool found) {
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics.length > 0 && logs[i].topics[0] == ArbLicenseHook.LicenseHonored.selector) {
                 return true;
@@ -171,7 +180,7 @@ contract ArbLicenseHookTest is Test, Deployers {
         vm.recordLogs();
         _swap(true, "");
 
-        assertEq(_lastTaxAppliedBps(), hook.minUnlicensedTaxBps());
+        assertEq(_lastTaxAppliedBps(vm.getRecordedLogs()), hook.minUnlicensedTaxBps());
     }
 
     function test_unlicensedSwap_scalesWithPriorityFee() public {
@@ -184,7 +193,7 @@ contract ArbLicenseHookTest is Test, Deployers {
         _swap(true, "");
 
         uint24 expected = hook.minUnlicensedTaxBps() + uint24(extraGwei * hook.taxBpsPerExtraGwei());
-        assertEq(_lastTaxAppliedBps(), expected);
+        assertEq(_lastTaxAppliedBps(vm.getRecordedLogs()), expected);
     }
 
     function test_unlicensedSwap_capsAtMaxTaxBps() public {
@@ -196,7 +205,7 @@ contract ArbLicenseHookTest is Test, Deployers {
         vm.recordLogs();
         _swap(true, "");
 
-        assertEq(_lastTaxAppliedBps(), hook.maxUnlicensedTaxBps());
+        assertEq(_lastTaxAppliedBps(vm.getRecordedLogs()), hook.maxUnlicensedTaxBps());
     }
 
     // --- licensed flat tax ---
@@ -212,8 +221,9 @@ contract ArbLicenseHookTest is Test, Deployers {
         vm.recordLogs();
         _swap(true, hookData);
 
-        assertEq(_lastTaxAppliedBps(), hook.licensedTaxBps());
-        assertTrue(_lastLicenseHonoredEmitted());
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(_lastTaxAppliedBps(logs), hook.licensedTaxBps());
+        assertTrue(_licenseHonoredEmitted(logs));
     }
 
     function test_licensedSwap_belowThreshold_noTaxLogicEngagesEither() public {
@@ -225,7 +235,7 @@ contract ArbLicenseHookTest is Test, Deployers {
         vm.recordLogs();
         _swap(true, "");
 
-        assertFalse(_lastLicenseHonoredEmitted());
+        assertFalse(_licenseHonoredEmitted(vm.getRecordedLogs()));
     }
 
     // --- permit validation edge cases ---
@@ -243,8 +253,9 @@ contract ArbLicenseHookTest is Test, Deployers {
         vm.recordLogs();
         _swap(true, hookData);
 
-        assertFalse(_lastLicenseHonoredEmitted());
-        assertTrue(_lastTaxAppliedBps() >= hook.minUnlicensedTaxBps());
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertFalse(_licenseHonoredEmitted(logs));
+        assertTrue(_lastTaxAppliedBps(logs) >= hook.minUnlicensedTaxBps());
     }
 
     function test_permitForWrongEpoch_fallsThroughToUnlicensedTax() public {
@@ -261,7 +272,7 @@ contract ArbLicenseHookTest is Test, Deployers {
         vm.recordLogs();
         _swap(true, hookData);
 
-        assertFalse(_lastLicenseHonoredEmitted());
+        assertFalse(_licenseHonoredEmitted(vm.getRecordedLogs()));
     }
 
     function test_permitNonce_incrementsAfterSuccessfulUse() public {
@@ -288,6 +299,6 @@ contract ArbLicenseHookTest is Test, Deployers {
         vm.recordLogs();
         _swap(true, hookData);
 
-        assertFalse(_lastLicenseHonoredEmitted());
+        assertFalse(_licenseHonoredEmitted(vm.getRecordedLogs()));
     }
 }

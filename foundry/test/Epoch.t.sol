@@ -10,11 +10,13 @@ contract EpochTest is Test {
         assertEq(Epoch.current(), 47);
     }
 
-    function test_current_roundsDownWithinEpoch() public {
-        vm.roll(Epoch.EPOCH_LENGTH * 47 + Epoch.EPOCH_LENGTH - 1);
+    function test_current_roundsDown_justBeforeEpochBoundary() public {
+        vm.roll(Epoch.EPOCH_LENGTH * 47 + Epoch.EPOCH_LENGTH - 1); // last block of epoch 47
         assertEq(Epoch.current(), 47);
+    }
 
-        vm.roll(Epoch.EPOCH_LENGTH * 48);
+    function test_current_advancesExactlyAtEpochBoundary() public {
+        vm.roll(Epoch.EPOCH_LENGTH * 48); // first block of epoch 48
         assertEq(Epoch.current(), 48);
     }
 

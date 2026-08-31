@@ -95,15 +95,15 @@ contract LicensePermitTest is Test {
     }
 
     function test_hashStruct_changesWithLicenseId() public view {
-        LicensePermit.Permit memory permitA = LicensePermit.Permit({
-            licenseId: 1,
-            licensee: licensee,
-            nonce: 0,
-            deadline: block.timestamp + 1 days
-        });
-        LicensePermit.Permit memory permitB = permitA;
-        permitB.licenseId = 2;
+        LicensePermit.Permit memory permitA =
+            LicensePermit.Permit({licenseId: 1, licensee: licensee, nonce: 0, deadline: block.timestamp + 1 days});
 
-        assertTrue(harness.hashStruct(permitA) != harness.hashStruct(permitB));
+        LicensePermit.Permit memory permitB =
+            LicensePermit.Permit({licenseId: 2, licensee: licensee, nonce: 0, deadline: block.timestamp + 1 days});
+
+        bytes32 hashA = harness.hashStruct(permitA);
+        bytes32 hashB = harness.hashStruct(permitB);
+
+        assertTrue(hashA != hashB, "hash did not change when licenseId changed");
     }
 }
