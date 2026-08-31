@@ -15,6 +15,7 @@ import {
     ModifyLiquidityParams,
     SwapParams
 } from "@uniswap/v4-core/src/types/PoolOperation.sol";
+import {LPFeeLibrary} from "@uniswap/v4-core/src/libraries/LPFeeLibrary.sol";
 
 
 import {LicenseNFT} from "./LicenseNFT.sol";
@@ -108,8 +109,11 @@ contract ArbLicenseHook is BaseHook {
 
         // Doesn't look arb-shaped by our proxy metric — no tax logic applies,
         // ordinary swap fee stands.
+
+        uint24 feeWithFlag = 3000 | LPFeeLibrary.OVERRIDE_FEE_FLAG;
+
         if (priorityFee < arbPriorityFeeThreshold) {
-            return (BaseHook.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
+            return (BaseHook.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, feeWithFlag);
         }
 
         PoolId poolId = key.toId();
