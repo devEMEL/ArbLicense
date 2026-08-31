@@ -27,7 +27,7 @@ import {
 ///      instead of this one if it fits your demo. This version exists so you
 ///      have full control (e.g. to extend with a helper that builds and signs
 ///      a LicensePermit for you before calling swap).
-contract Router is IUnlockCallback {
+contract SwapRouter is IUnlockCallback {
     using CurrencyLibrary for Currency;
 
     IPoolManager public immutable poolManager;

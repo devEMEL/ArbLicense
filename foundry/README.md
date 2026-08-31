@@ -73,7 +73,7 @@ src/
   LicenseNFT.sol            ERC-1155 license tokens, mint-gated to EpochAuction
   EpochAuction.sol          Bidding, settlement, mints license, donates
                             winning bid to LPs
-  DemoSwapRouter.sol        Minimal router for testing/demoing swaps against
+  SwapRouter.sol        Minimal router for testing/demoing swaps against
                             the pool (passes hookData through for permits)
   libraries/
     LicenseId.sol            Packs (poolId, epoch) -> ERC-1155 token id
@@ -86,24 +86,35 @@ src/
 | `ArbLicenseHook` | Runs on every swap. Decides tax rate. |
 | `LicenseNFT` | Source of truth for "who's licensed this epoch." |
 | `EpochAuction` | Sells the license, funds LPs from the proceeds. |
-| `DemoSwapRouter` | Lets you actually call `swap()` for testing. |
+| `SwapRouter` | Lets you actually call `swap()` for testing. |
 
 ## Setup
 
 ```bash
-forge install Uniswap/v4-core
-forge install Uniswap/v4-periphery
-forge install OpenZeppelin/openzeppelin-contracts
 forge install foundry-rs/forge-std
+forge install Uniswap/v4-hooks-public
+forge install Vectorized/solady
+forge install OpenZeppelin/openzeppelin-contracts
+forge install OpenZeppelin/openzeppelin-contracts-upgradeable
 ```
 
 `remappings.txt`:
 ```
-v4-core/=lib/v4-core/
-v4-periphery/=lib/v4-periphery/
-@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+@uniswap/v4-core/=lib/v4-hooks-public/lib/v4-periphery/lib/v4-core/
+@uniswap/v4-periphery/=lib/v4-hooks-public/lib/v4-periphery/
 forge-std/=lib/forge-std/src/
-solmate/=lib/v4-core/lib/solmate/
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
+
+@solady/=lib/solady/src/
+solmate/=lib/v4-hooks-public/lib/v4-periphery/lib/v4-core/lib/solmate/
+v4-hooks-public/=lib/v4-hooks-public/
+@uniswap/v4-core/=lib/v4-hooks-public/lib/v4-periphery/lib/v4-core/
+@uniswap/v4-periphery/=lib/v4-hooks-public/lib/v4-periphery/src
+
+@arblicense/=src/
+@arblicense-libraries/=src/libraries/
+@arblicense-interfaces/=src/interfaces/
 ```
 > `solmate` is only needed for the tests (`MockERC20`) and typically already
 > sits inside v4-core's own `lib/` as a transitive dependency — adjust the
@@ -139,7 +150,7 @@ suite (see the version-sensitivity note at the top of each file).
 > - `Hooks.Permissions` struct fields in `ArbLicenseHook.getHookPermissions()`
 > - The dynamic-fee override flag (`0x400000`) used in `_beforeSwap`
 > - The `donate`/`settle`/`sync` call sequence in `EpochAuction.unlockCallback`
->   and `DemoSwapRouter._settle`
+>   and `SwapRouter._settle`
 > - `BaseHook`'s import path and constructor in `v4-periphery`
 
 ## Deploy & wire up
@@ -157,7 +168,7 @@ suite (see the version-sensitivity note at the top of each file).
    `TaxApplied` event but pay whatever static fee you set instead of the
    actual tax. This bit us in testing; see `ArbLicenseHook.t.sol`'s
    `initPool(...)` call for the fix.
-6. Deploy `DemoSwapRouter(poolManager)` for testing.
+6. Deploy `SwapRouter(poolManager)` for testing.
 
 ## Demoing the tax difference
 
@@ -170,7 +181,7 @@ vm.txGasPrice(5 gwei);   // sets tx.gasprice -> priority fee = 4 gwei
 ```
 
 Then:
-- **Unlicensed swap:** call `DemoSwapRouter.swap(key, params, "")` with empty
+- **Unlicensed swap:** call `SwapRouter.swap(key, params, "")` with empty
   `hookData` → charged the scaled rate from `_scaledUnlicensedTaxBps`
   (floor `minUnlicensedTaxBps`, capped at `maxUnlicensedTaxBps`).
 - **Licensed swap:** build a `LicensePermit.Permit`, sign it off-chain (or
