@@ -15,8 +15,7 @@ fs_permissions = [{access = "read-write", path = ".forge-snapshots/"}]
 
 
 [rpc_endpoints]
-arc_testnet = "https://arc-testnet.drpc.org"
-base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
+unichain_sepolia = "https://sepolia.unichain.org"
 
 [lint]
 exclude_lints = ["block-timestamp", "unsafe-typecast", "divide-before-multiply"]
@@ -32,6 +31,9 @@ int_types = "short"
 quote_style = "double"
 number_underscore = "preserve"
 wrap_comments = true
+
+# forge coverage --ir-minimum
+
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 

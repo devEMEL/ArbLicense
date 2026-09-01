@@ -48,7 +48,7 @@ import {SwapRouter} from "@arblicense/SwapRouter.sol";
 contract DeployCore is Script {
     /// @dev Canonical CREATE2 factory (Arachnid's deterministic deployment
     ///      proxy) present on essentially every EVM chain at this exact address.
-    address constant CREATE2_DEPLOYER = 0x4e59b44847b379578588920cA78FbF26c0B4956;
+    address constant CREATE2_DEPLOYER = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
     function run()
         external
