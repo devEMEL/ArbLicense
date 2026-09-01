@@ -162,7 +162,7 @@ contract DemoFlowTest is Test, Deployers {
         assertTrue(Epoch.isActive(targetEpoch), "not in target epoch");
 
         vm.fee(1 gwei);
-        vm.txGasPrice(1 gwei + hook.arbPriorityFeeThreshold() + 125 gwei); // aggressive tip, from 20
+        vm.txGasPrice(1 gwei + hook.arbPriorityFeeThreshold() + 125 gwei); // aggressive tip
 
         // 4a. Rival has no license -> scaled unlicensed tax (capped here).
         uint24 rivalTaxFee = _swapViaRouter(rival, "");
