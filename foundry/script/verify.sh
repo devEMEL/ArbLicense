@@ -12,7 +12,7 @@
 # poolManager: contract IPoolManager 0x00B036B58a818B1BC34d502D3fE730Db729e62AC
 # licenseNFT: contract LicenseNFT 0x645C1b3E13EC2f36a414410679D0c71AAA8b48a4
 # auction: contract EpochAuction 0xD2E89ec3ee53E017b9fE5755baD2D00622250a31
-# hook: contract ArbLicenseHook 
+# hook: contract ArbLicenseHook 0xaE43461c96dBf1a14249e6fFA93Bc06AEE824088
 # router: contract SwapRouter 0xcf3C40142ff5C31b71c59f5191AAe26093742F2a
 
 
