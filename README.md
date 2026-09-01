@@ -33,14 +33,14 @@ flow straight to LPs.
    - **Holds the current epoch's license** (proven via a signed EIP-712
      permit passed in `hookData`, not `msg.sender`/`tx.origin` — so it
      survives routing through aggregators or smart-contract wallets) →
-     charged a flat **1%** LP fee (`licensedTaxBps`), regardless of how much
+     charged a flat **1%** LP fee (`licensedTaxFee`), regardless of how much
      priority fee they paid. The auction bid already paid for this discount,
      so their per-swap cost stays predictable.
    - **Doesn't hold it** → charged a tax that **scales with priority fee**:
-     starts at a floor of **5%** (`minUnlicensedTaxBps`) the moment a swap
+     starts at a floor of **5%** (`minUnlicensedTaxFee`) the moment a swap
      crosses the arb-shaped threshold, climbs **+2% per extra gwei** of
-     priority fee paid (`taxBpsPerExtraGwei`), capped at **30%**
-     (`maxUnlicensedTaxBps`). Applied via v4's dynamic-fee override on
+     priority fee paid (`taxFeePerExtraGwei`), capped at **30%**
+     (`maxUnlicensedTaxFee`). Applied via v4's dynamic-fee override on
      `beforeSwap`. The scaling means a barely-arb-shaped swap pays close to
      the floor, while an aggressively-tipping bot pays close to the cap —
      not a single flat rate regardless of urgency.
@@ -182,17 +182,17 @@ vm.txGasPrice(5 gwei);   // sets tx.gasprice -> priority fee = 4 gwei
 
 Then:
 - **Unlicensed swap:** call `SwapRouter.swap(key, params, "")` with empty
-  `hookData` → charged the scaled rate from `_scaledUnlicensedTaxBps`
-  (floor `minUnlicensedTaxBps`, capped at `maxUnlicensedTaxBps`).
+  `hookData` → charged the scaled rate from `_scaledUnlicensedTaxFee`
+  (floor `minUnlicensedTaxFee`, capped at `maxUnlicensedTaxFee`).
 - **Licensed swap:** build a `LicensePermit.Permit`, sign it off-chain (or
   with `vm.sign` in a test), ABI-encode `(licensee, nonce, deadline,
   signature)` as `hookData`, then call `swap()` with it → charged the flat
-  `licensedTaxBps`.
+  `licensedTaxFee`.
 
 To show the *scaling* behavior specifically (not just licensed-vs-unlicensed),
 run several unlicensed swaps with increasing `vm.txGasPrice(...)` values and
-compare the `taxBps` value emitted in each `TaxApplied` event — it should
-step up by `taxBpsPerExtraGwei` per extra gwei until it hits the cap.
+compare the `taxFee` value emitted in each `TaxApplied` event — it should
+step up by `taxFeePerExtraGwei` per extra gwei until it hits the cap.
 
 Compare the resulting `BalanceDelta` and the pool's accrued LP fees across
 swaps to show the tax spread live.
@@ -214,9 +214,9 @@ swaps to show the tax spread live.
   amount.** The more direct approach (see Angstrom L2's arbitrage auction)
   taxes `gasUsed × multiplier × priorityFee` as an absolute amount of the
   gas-token currency, since priority fee is itself ETH-denominated. This repo
-  uses a tuned bps-per-gwei scale instead, which works uniformly across
+  uses a tuned fee-per-gwei scale instead, which works uniformly across
   arbitrary token pairs without needing an ETH↔token price. Since this pool
   uses **native ETH** as one of its two currencies, the absolute-ETH-amount
   approach is actually implementable here without an oracle (tax the ETH leg
   directly via `BeforeSwapDelta`) — worth considering as a follow-up if you
-  want tax to track priority fee exactly rather than approximate it via bps.
+  want tax to track priority fee exactly rather than approximate it via fee.

@@ -114,8 +114,8 @@ contract DemoFlowTest is Test, Deployers {
 
     /// @dev Swaps 0.01 ETH -> token through THIS repo's SwapRouter (not
     ///      PoolSwapTest), as `who`, attaching `hookData`, and returns the
-    ///      taxBps pulled from the hook's TaxApplied event.
-    function _swapViaRouter(address who, bytes memory hookData) internal returns (uint24 taxBps) {
+    ///      taxFee pulled from the hook's TaxApplied event.
+    function _swapViaRouter(address who, bytes memory hookData) internal returns (uint24 taxFee) {
         SwapParams memory params = SwapParams({
             zeroForOne: true, // ETH in, token out
             amountSpecified: -0.01 ether,
@@ -129,8 +129,8 @@ contract DemoFlowTest is Test, Deployers {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = logs.length; i > 0; i--) {
             if (logs[i - 1].topics.length > 0 && logs[i - 1].topics[0] == ArbLicenseHook.TaxApplied.selector) {
-                (, taxBps) = abi.decode(logs[i - 1].data, (uint256, uint24));
-                return taxBps;
+                (, taxFee) = abi.decode(logs[i - 1].data, (uint256, uint24));
+                return taxFee;
             }
         }
         revert("TaxApplied event not found");
@@ -162,21 +162,21 @@ contract DemoFlowTest is Test, Deployers {
         assertTrue(Epoch.isActive(targetEpoch), "not in target epoch");
 
         vm.fee(1 gwei);
-        vm.txGasPrice(1 gwei + hook.arbPriorityFeeThreshold() + 20 gwei); // aggressive tip
+        vm.txGasPrice(1 gwei + hook.arbPriorityFeeThreshold() + 125 gwei); // aggressive tip, from 20
 
         // 4a. Rival has no license -> scaled unlicensed tax (capped here).
-        uint24 rivalTaxBps = _swapViaRouter(rival, "");
+        uint24 rivalTaxFee = _swapViaRouter(rival, "");
 
         // 4b. Licensee proves the license via a signed EIP-712 permit passed
         //     as hookData (not msg.sender) -> flat licensed rate.
         bytes memory permitData = _buildPermit(0, licenseId);
-        uint24 licenseeTaxBps = _swapViaRouter(licensee, permitData);
+        uint24 licenseeTaxFee = _swapViaRouter(licensee, permitData);
 
-        assertEq(licenseeTaxBps, hook.licensedTaxBps(), "licensee should pay the flat 1% rate");
-        assertEq(rivalTaxBps, hook.maxUnlicensedTaxBps(), "rival's tip is big enough to hit the 30% cap");
-        assertGt(rivalTaxBps, licenseeTaxBps, "rival should pay far more than the licensee");
+        assertEq(licenseeTaxFee, hook.licensedTaxFee(), "licensee should pay the flat 1% rate");
+        assertEq(rivalTaxFee, hook.maxUnlicensedTaxFee(), "rival's tip is big enough to hit the 30% cap");
+        assertGt(rivalTaxFee, licenseeTaxFee, "rival should pay far more than the licensee");
 
-        emit log_named_uint("licensee taxBps (flat, licensed)", licenseeTaxBps);
-        emit log_named_uint("rival taxBps (scaled, unlicensed, capped)", rivalTaxBps);
+        emit log_named_uint("licensee taxFee (flat, licensed)", licenseeTaxFee);
+        emit log_named_uint("rival taxFee (scaled, unlicensed, capped)", rivalTaxFee);
     }
 }

@@ -130,17 +130,17 @@ contract ArbLicenseHookTest is Test, Deployers {
         }
     }
 
-    /// @dev Pulls taxBps out of the most recently emitted TaxApplied event.
+    /// @dev Pulls taxFee out of the most recently emitted TaxApplied event.
     ///      Takes `logs` as a parameter rather than calling
     ///      vm.getRecordedLogs() itself — that cheatcode consumes the buffer,
     ///      so calling it more than once per test silently returns empty on
     ///      every call after the first. Capture logs ONCE per test and reuse.
-    function _lastTaxAppliedBps(Vm.Log[] memory logs) internal pure returns (uint24 taxBps) {
+    function _lastTaxAppliedFee(Vm.Log[] memory logs) internal pure returns (uint24 taxFee) {
         for (uint256 i = logs.length; i > 0; i--) {
             Vm.Log memory log = logs[i - 1];
             if (log.topics.length > 0 && log.topics[0] == ArbLicenseHook.TaxApplied.selector) {
-                (, taxBps) = abi.decode(log.data, (uint256, uint24));
-                return taxBps;
+                (, taxFee) = abi.decode(log.data, (uint256, uint24));
+                return taxFee;
             }
         }
         revert("TaxApplied event not found");
@@ -180,7 +180,7 @@ contract ArbLicenseHookTest is Test, Deployers {
         vm.recordLogs();
         _swap(true, "");
 
-        assertEq(_lastTaxAppliedBps(vm.getRecordedLogs()), hook.minUnlicensedTaxBps());
+        assertEq(_lastTaxAppliedFee(vm.getRecordedLogs()), hook.minUnlicensedTaxFee());
     }
 
     function test_unlicensedSwap_scalesWithPriorityFee() public {
@@ -192,11 +192,11 @@ contract ArbLicenseHookTest is Test, Deployers {
         vm.recordLogs();
         _swap(true, "");
 
-        uint24 expected = hook.minUnlicensedTaxBps() + uint24(extraGwei * hook.taxBpsPerExtraGwei());
-        assertEq(_lastTaxAppliedBps(vm.getRecordedLogs()), expected);
+        uint24 expected = hook.minUnlicensedTaxFee() + uint24(extraGwei * hook.taxFeePerExtraGwei());
+        assertEq(_lastTaxAppliedFee(vm.getRecordedLogs()), expected);
     }
 
-    function test_unlicensedSwap_capsAtMaxTaxBps() public {
+    function test_unlicensedSwap_capsAtMaxTaxFee() public {
         vm.fee(1 gwei);
         uint256 threshold = hook.arbPriorityFeeThreshold();
         // Comfortably beyond whatever priority fee would be needed to hit the cap.
@@ -205,7 +205,7 @@ contract ArbLicenseHookTest is Test, Deployers {
         vm.recordLogs();
         _swap(true, "");
 
-        assertEq(_lastTaxAppliedBps(vm.getRecordedLogs()), hook.maxUnlicensedTaxBps());
+        assertEq(_lastTaxAppliedFee(vm.getRecordedLogs()), hook.maxUnlicensedTaxFee());
     }
 
     // --- licensed flat tax ---
@@ -222,7 +222,7 @@ contract ArbLicenseHookTest is Test, Deployers {
         _swap(true, hookData);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        assertEq(_lastTaxAppliedBps(logs), hook.licensedTaxBps());
+        assertEq(_lastTaxAppliedFee(logs), hook.licensedTaxFee());
         assertTrue(_licenseHonoredEmitted(logs));
     }
 
@@ -255,7 +255,7 @@ contract ArbLicenseHookTest is Test, Deployers {
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertFalse(_licenseHonoredEmitted(logs));
-        assertTrue(_lastTaxAppliedBps(logs) >= hook.minUnlicensedTaxBps());
+        assertTrue(_lastTaxAppliedFee(logs) >= hook.minUnlicensedTaxFee());
     }
 
     function test_permitForWrongEpoch_fallsThroughToUnlicensedTax() public {

@@ -41,30 +41,30 @@ contract ArbLicenseHook is BaseHook {
     ///      Deliberately NOT scaled with priority fee: the licensee already
     ///      pre-paid for cheap access at auction, so their per-swap cost
     ///      should stay predictable regardless of how urgently they trade.
-    uint24 public licensedTaxBps = 100; // 1%
+    uint24 public licensedTaxFee = 10000; // 1%
 
-    /// @dev Floor tax rate (bps) applied to unlicensed arb-shaped swaps the
+    /// @dev Floor tax rate (fee) applied to unlicensed arb-shaped swaps the
     ///      moment they cross arbPriorityFeeThreshold.
-    uint24 public minUnlicensedTaxBps = 500; // 5%
+    uint24 public minUnlicensedTaxFee = 50000; // 5%
 
-    /// @dev Ceiling tax rate (bps) — the unlicensed rate never exceeds this,
+    /// @dev Ceiling tax rate (fee) — the unlicensed rate never exceeds this,
     ///      regardless of how high priority fee goes. Keeps the tax from
     ///      approaching 100% and making the pool practically unusable to
     ///      unlicensed arbers (a total block, not just a tax).
-    uint24 public maxUnlicensedTaxBps = 3000; // 30%
+    uint24 public maxUnlicensedTaxFee = 300000; // 30%
 
-    /// @dev How many extra bps of tax get added per extra gwei of priority
+    /// @dev How many extra fee of tax get added per extra gwei of priority
     ///      fee paid above arbPriorityFeeThreshold. This is the knob that
     ///      makes the tax scale with how much the searcher was willing to
     ///      pay — the closer analogue to Angstrom's "tax ~ priority fee"
-    ///      model, expressed in bps-per-gwei instead of wei-per-wei.
-    uint256 public taxBpsPerExtraGwei = 200; // +2% tax per extra gwei of tip
+    ///      model, expressed in fee-per-gwei instead of wei-per-wei.
+    uint256 public taxFeePerExtraGwei = 2000; // +2% tax per extra gwei of tip
 
     /// @dev Per-licensee replay-protection nonce for permits.
     mapping(address => uint256) public permitNonces;
 
     event TaxApplied(
-        PoolId indexed poolId, uint64 indexed epoch, address indexed swapper, uint256 priorityFee, uint24 taxBps
+        PoolId indexed poolId, uint64 indexed epoch, address indexed swapper, uint256 priorityFee, uint24 taxFee
     );
     event LicenseHonored(PoolId indexed poolId, uint64 indexed epoch, address indexed licensee);
 
@@ -123,31 +123,31 @@ contract ArbLicenseHook is BaseHook {
         address licensee = _recoverLicensee(id, hookData);
         bool isLicensee = licensee != address(0) && licenseNFT.balanceOf(licensee, id) > 0;
 
-        uint24 taxBps = isLicensee ? licensedTaxBps : _scaledUnlicensedTaxBps(priorityFee);
+        uint24 taxFee = isLicensee ? licensedTaxFee : _scaledUnlicensedTaxFee(priorityFee);
 
         // The OVERRIDE_FEE_FLAG bit convention below must match your pinned
         // v4-core version's dynamic-fee handling in PoolManager.
-        uint24 overrideFee = taxBps | 0x400000;
+        uint24 overrideFee = taxFee | 0x400000;
 
         if (isLicensee) {
             emit LicenseHonored(poolId, epoch, licensee);
         }
-        emit TaxApplied(poolId, epoch, sender, priorityFee, taxBps);
+        emit TaxApplied(poolId, epoch, sender, priorityFee, taxFee);
 
         return (BaseHook.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, overrideFee);
     }
 
-    /// @dev Maps priority fee -> tax bps for unlicensed swaps: starts at
-    ///      minUnlicensedTaxBps right at the arb threshold, climbs by
-    ///      taxBpsPerExtraGwei for every gwei of priority fee beyond that,
-    ///      capped at maxUnlicensedTaxBps.
-    function _scaledUnlicensedTaxBps(uint256 priorityFee) internal view returns (uint24) {
+    /// @dev Maps priority fee -> tax fee for unlicensed swaps: starts at
+    ///      minUnlicensedTaxFee right at the arb threshold, climbs by
+    ///      taxFeePerExtraGwei for every gwei of priority fee beyond that,
+    ///      capped at maxUnlicensedTaxFee.
+    function _scaledUnlicensedTaxFee(uint256 priorityFee) internal view returns (uint24) {
         uint256 excessWei = priorityFee - arbPriorityFeeThreshold; // safe: priorityFee >= threshold here
         uint256 excessGwei = excessWei / 1 gwei;
-        uint256 scaled = uint256(minUnlicensedTaxBps) + (excessGwei * taxBpsPerExtraGwei);
+        uint256 scaled = uint256(minUnlicensedTaxFee) + (excessGwei * taxFeePerExtraGwei);
 
-        if (scaled > maxUnlicensedTaxBps) {
-            return maxUnlicensedTaxBps;
+        if (scaled > maxUnlicensedTaxFee) {
+            return maxUnlicensedTaxFee;
         }
         return uint24(scaled);
     }
