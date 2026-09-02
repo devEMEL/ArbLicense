@@ -37,9 +37,9 @@ flow straight to LPs.
      priority fee they paid. The auction bid already paid for this discount,
      so their per-swap cost stays predictable.
    - **Doesn't hold it** → charged a tax that **scales with priority fee**:
-     starts at a floor of **5%** (`minUnlicensedTaxFee`) the moment a swap
-     crosses the arb-shaped threshold, climbs **+2% per extra gwei** of
-     priority fee paid (`taxFeePerExtraGwei`), capped at **30%**
+     starts at a floor of **2%** (`minUnlicensedTaxFee`) the moment a swap
+     crosses the arb-shaped threshold, climbs **+2% per extra gwei** of 
+     priority fee paid (`taxFeePerExtraGwei`), capped at **5%**
      (`maxUnlicensedTaxFee`). Applied via v4's dynamic-fee override on
      `beforeSwap`. The scaling means a barely-arb-shaped swap pays close to
      the floor, while an aggressively-tipping bot pays close to the cap —

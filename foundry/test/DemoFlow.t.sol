@@ -143,7 +143,7 @@ contract DemoFlowTest is Test, Deployers {
     ///   3. epoch begins; BOTH licensee and an unlicensed rival fire the
     ///      same aggressively-tipped swap through SwapRouter
     ///   4. licensee attaches a signed permit as hookData and pays the flat
-    ///      1% rate; rival pays the scaled rate, capped at 30% here
+    ///      1% rate; rival pays the scaled rate, capped at 5% here
     function test_demo_fullFlow_licenseeSwapsCheapRivalSwapsExpensive() public {
         // 1. Bid and win.
         vm.prank(licensee);
@@ -174,7 +174,7 @@ contract DemoFlowTest is Test, Deployers {
         uint24 licenseeTaxFee = _swapViaRouter(licensee, permitData);
 
         assertEq(licenseeTaxFee, hook.licensedTaxFee(), "licensee should pay the flat 1% rate");
-        assertEq(rivalTaxFee, hook.maxUnlicensedTaxFee(), "rival's tip is big enough to hit the 30% cap");
+        assertEq(rivalTaxFee, hook.maxUnlicensedTaxFee(), "rival's tip is big enough to hit the 5% cap");
         assertGt(rivalTaxFee, licenseeTaxFee, "rival should pay far more than the licensee");
 
         emit log_named_uint("licensee taxFee (flat, licensed)", licenseeTaxFee);

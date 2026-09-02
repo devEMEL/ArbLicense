@@ -45,13 +45,13 @@ contract ArbLicenseHook is BaseHook {
 
     /// @dev Floor tax rate (fee) applied to unlicensed arb-shaped swaps the
     ///      moment they cross arbPriorityFeeThreshold.
-    uint24 public minUnlicensedTaxFee = 50000; // 5%
+    uint24 public minUnlicensedTaxFee = 20000; // 2%
 
     /// @dev Ceiling tax rate (fee) — the unlicensed rate never exceeds this,
     ///      regardless of how high priority fee goes. Keeps the tax from
     ///      approaching 100% and making the pool practically unusable to
     ///      unlicensed arbers (a total block, not just a tax).
-    uint24 public maxUnlicensedTaxFee = 300000; // 30%
+    uint24 public maxUnlicensedTaxFee = 50000; // 5%
 
     /// @dev How many extra fee of tax get added per extra gwei of priority
     ///      fee paid above arbPriorityFeeThreshold. This is the knob that
