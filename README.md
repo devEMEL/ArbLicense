@@ -177,7 +177,7 @@ local/Foundry demo you'll want to simulate it directly:
 
 ```solidity
 vm.fee(1 gwei);          // sets block.basefee
-vm.txGasPrice(5 gwei);   // sets tx.gasprice -> priority fee = 4 gwei
+vm.txGasPrice(128 gwei);   // sets tx.gasprice -> priority fee = 127 gwei
 ```
 
 Then:
